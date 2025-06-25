@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Note By Voice</string>
+    
+    <!-- App Info -->
+    <string name="app_description">Convert your voice recordings into organized notes and tasks</string>
+    <string name="privacy_policy_url">https://sites.google.com/view/notebyvoice/home</string>
+    
+    <!-- Permission Rationales -->
+    <string name="microphone_permission_rationale">Note By Voice needs microphone access to record your voice notes</string>
+    <string name="calendar_permission_rationale">Allow calendar access to add tasks to your calendar</string>
+    <string name="notification_permission_rationale">Enable notifications to receive reminders for your tasks</string>
+</resources>
