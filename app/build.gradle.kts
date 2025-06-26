@@ -56,6 +56,22 @@ android {
         // Get API key from local.properties or environment variable
         val geminiApiKey = localProperties.getProperty("GEMINI_API_KEY") ?: System.getenv("GEMINI_API_KEY") ?: ""
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+        
+        // AdMob configuration
+        val admobAppId = localProperties.getProperty("ADMOB_APP_ID") ?: ""
+        val admobInterstitialId = localProperties.getProperty("ADMOB_INTERSTITIAL_ID") ?: ""
+        val admobRewardedId = localProperties.getProperty("ADMOB_REWARDED_ID") ?: ""
+        val admobBannerId = localProperties.getProperty("ADMOB_BANNER_ID") ?: ""
+        
+        manifestPlaceholders["ADMOB_APP_ID"] = admobAppId
+        buildConfigField("String", "ADMOB_APP_ID", "\"$admobAppId\"")
+        buildConfigField("String", "ADMOB_INTERSTITIAL_ID", "\"$admobInterstitialId\"")
+        buildConfigField("String", "ADMOB_REWARDED_ID", "\"$admobRewardedId\"")
+        buildConfigField("String", "ADMOB_BANNER_ID", "\"$admobBannerId\"")
+        
+        // Test user configuration
+        val testUserEmail = localProperties.getProperty("TEST_USER_EMAIL") ?: ""
+        buildConfigField("String", "TEST_USER_EMAIL", "\"$testUserEmail\"")
     }
 
     buildTypes {
@@ -138,6 +154,15 @@ dependencies {
     
     // Google Gemini AI
     implementation(libs.google.generativeai)
+    
+    // Google Play Billing
+    implementation("com.android.billingclient:billing-ktx:6.1.0")
+    
+    // AdMob
+    implementation("com.google.android.gms:play-services-ads:22.5.0")
+    
+    // DataStore for subscription cache
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
     
     // Testing
     testImplementation(libs.junit)

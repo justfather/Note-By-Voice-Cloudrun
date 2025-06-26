@@ -2,21 +2,35 @@ package com.ppai.voicetotask.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ppai.voicetotask.data.billing.BillingManager
+import com.ppai.voicetotask.domain.model.Subscription
+import com.ppai.voicetotask.domain.repository.SubscriptionRepository
 import com.ppai.voicetotask.domain.usecase.DeleteAllNotesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val deleteAllNotesUseCase: DeleteAllNotesUseCase
+    private val deleteAllNotesUseCase: DeleteAllNotesUseCase,
+    private val subscriptionRepository: SubscriptionRepository,
+    private val billingManager: BillingManager
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+    
+    val subscription: StateFlow<Subscription?> = subscriptionRepository.getCurrentSubscription()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
     
     fun onDeleteAllNotesClick() {
         _uiState.value = _uiState.value.copy(showDeleteConfirmDialog = true)
@@ -66,6 +80,32 @@ class SettingsViewModel @Inject constructor(
     fun clearDeleteSuccess() {
         _uiState.value = _uiState.value.copy(deleteSuccess = false)
     }
+    
+    fun restorePurchases() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isRestoringPurchase = true)
+            try {
+                val restored = billingManager.restorePurchases()
+                _uiState.value = _uiState.value.copy(
+                    isRestoringPurchase = false,
+                    restorePurchaseResult = restored
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isRestoringPurchase = false,
+                    restorePurchaseResult = false
+                )
+            }
+        }
+    }
+    
+    fun clearRestorePurchaseResult() {
+        _uiState.value = _uiState.value.copy(restorePurchaseResult = null)
+    }
+    
+    fun refreshSubscription() {
+        // Subscription is automatically refreshed via Flow
+    }
 }
 
 data class SettingsUiState(
@@ -73,5 +113,7 @@ data class SettingsUiState(
     val deleteConfirmationText: String = "",
     val deleteConfirmationError: String? = null,
     val isDeleting: Boolean = false,
-    val deleteSuccess: Boolean = false
+    val deleteSuccess: Boolean = false,
+    val isRestoringPurchase: Boolean = false,
+    val restorePurchaseResult: Boolean? = null
 )

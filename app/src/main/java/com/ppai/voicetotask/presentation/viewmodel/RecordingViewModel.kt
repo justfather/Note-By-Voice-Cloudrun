@@ -8,6 +8,8 @@ import com.ppai.voicetotask.domain.repository.NoteRepository
 import com.ppai.voicetotask.domain.repository.TaskRepository
 import com.ppai.voicetotask.domain.usecase.ProcessVoiceNoteUseCase
 import com.ppai.voicetotask.domain.usecase.RecordAudioUseCase
+import com.ppai.voicetotask.data.ads.AdManager
+import com.ppai.voicetotask.domain.repository.SubscriptionRepository
 import com.ppai.voicetotask.util.NetworkUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -15,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Date
@@ -26,7 +29,9 @@ class RecordingViewModel @Inject constructor(
     private val recordAudioUseCase: RecordAudioUseCase,
     private val processVoiceNoteUseCase: ProcessVoiceNoteUseCase,
     private val noteRepository: NoteRepository,
-    private val taskRepository: TaskRepository
+    private val taskRepository: TaskRepository,
+    private val subscriptionRepository: SubscriptionRepository,
+    private val adManager: AdManager
 ) : AndroidViewModel(application) {
     
     private val _uiState = MutableStateFlow(RecordingUiState())
@@ -38,6 +43,19 @@ class RecordingViewModel @Inject constructor(
     fun startRecording(resumeFromPrevious: Boolean = false) {
         viewModelScope.launch {
             try {
+                // Check subscription and recording limits
+                val subscription = subscriptionRepository.getCurrentSubscription().first()
+                
+                if (!subscription.canRecord()) {
+                    _uiState.update { 
+                        it.copy(
+                            error = "Monthly recording limit reached (${com.ppai.voicetotask.domain.model.Subscription.FREE_MONTHLY_LIMIT} recordings)",
+                            showPaywall = true
+                        )
+                    }
+                    return@launch
+                }
+                
                 recordAudioUseCase.startRecording(resumeFromPrevious)
                 _uiState.update { it.copy(isRecording = true, isPaused = false, error = null) }
                 startTimer()
@@ -91,12 +109,52 @@ class RecordingViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 timerJob?.cancel()
-                _uiState.update { it.copy(isRecording = false, isProcessing = true) }
+                
+                // Check subscription status
+                val subscription = subscriptionRepository.getCurrentSubscription().first()
+                
+                if (!subscription.isPremium()) {
+                    // Free user - show ad first
+                    _uiState.update { it.copy(isRecording = false, showingAd = true) }
+                } else {
+                    // Premium user - process immediately
+                    _uiState.update { it.copy(isRecording = false, isProcessing = true) }
+                    
+                    val audioFile = recordAudioUseCase.stopRecording()
+                    if (audioFile != null) {
+                        processRecording(audioFile.absolutePath)
+                    } else {
+                        _uiState.update { 
+                            it.copy(
+                                isProcessing = false,
+                                error = "No audio recorded"
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update { 
+                    it.copy(
+                        isProcessing = false,
+                        showingAd = false,
+                        error = "Failed to stop recording: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+    
+    fun onAdDismissed() {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(showingAd = false, isProcessing = true) }
                 
                 val audioFile = recordAudioUseCase.stopRecording()
-                
                 if (audioFile != null) {
                     processRecording(audioFile.absolutePath)
+                    
+                    // Increment recording count for free users
+                    subscriptionRepository.incrementRecordingCount()
                 } else {
                     _uiState.update { 
                         it.copy(
@@ -109,7 +167,7 @@ class RecordingViewModel @Inject constructor(
                 _uiState.update { 
                     it.copy(
                         isProcessing = false,
-                        error = "Failed to stop recording: ${e.message}"
+                        error = "Failed to process recording: ${e.message}"
                     )
                 }
             }
@@ -124,12 +182,25 @@ class RecordingViewModel @Inject constructor(
     
     private fun startTimer() {
         timerJob = viewModelScope.launch {
+            val maxDuration = subscriptionRepository.getMaxRecordingDuration()
+            
             while (_uiState.value.isRecording && !_uiState.value.isPaused) {
                 delay(100)
                 _uiState.update { currentState ->
-                    currentState.copy(
-                        recordingDuration = currentState.recordingDuration + 100
-                    )
+                    val newDuration = currentState.recordingDuration + 100
+                    
+                    // Check if max duration reached
+                    if (newDuration >= maxDuration) {
+                        stopRecording()
+                        currentState.copy(
+                            recordingDuration = newDuration,
+                            maxDurationReached = true
+                        )
+                    } else {
+                        currentState.copy(
+                            recordingDuration = newDuration
+                        )
+                    }
                 }
             }
         }
@@ -209,6 +280,8 @@ class RecordingViewModel @Inject constructor(
         }
     }
     
+    fun getAdManager(): AdManager = adManager
+    
     override fun onCleared() {
         super.onCleared()
         cancelRecording()
@@ -223,5 +296,8 @@ data class RecordingUiState(
     val recordingDuration: Long = 0L,
     val error: String? = null,
     val savedNoteId: String? = null,
-    val isResuming: Boolean = false
+    val isResuming: Boolean = false,
+    val showingAd: Boolean = false,
+    val showPaywall: Boolean = false,
+    val maxDurationReached: Boolean = false
 )

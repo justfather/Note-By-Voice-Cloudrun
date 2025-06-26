@@ -22,8 +22,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ppai.voicetotask.data.ads.AdManager
 import com.ppai.voicetotask.presentation.theme.RecordingRed
 import com.ppai.voicetotask.presentation.theme.RecordingPulse
+import com.ppai.voicetotask.presentation.ui.paywall.PaywallScreen
 import com.ppai.voicetotask.presentation.viewmodel.RecordingViewModel
 import com.ppai.voicetotask.util.PermissionHandler
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -42,8 +44,11 @@ fun RecordingScreen(
     onCancel: () -> Unit,
     viewModel: RecordingViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var hasPermission by remember { mutableStateOf(false) }
+    val adManager = remember { viewModel.getAdManager() }
     
     PermissionHandler(
         permission = Manifest.permission.RECORD_AUDIO,
@@ -97,6 +102,31 @@ fun RecordingScreen(
             contentAlignment = Alignment.Center
         ) {
             when {
+                uiState.showingAd -> {
+                    // Show ad for free users
+                    LaunchedEffect(Unit) {
+                        activity?.let { act ->
+                            adManager.showInterstitialAd(
+                                activity = act,
+                                onAdDismissed = {
+                                    viewModel.onAdDismissed()
+                                }
+                            )
+                        } ?: viewModel.onAdDismissed() // Skip ad if no activity
+                    }
+                    
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        CircularProgressIndicator()
+                        Text(
+                            text = "Please wait...",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+                
                 uiState.isProcessing -> {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -246,6 +276,33 @@ fun RecordingScreen(
                 }
             }
         }
+    }
+    
+    // Show paywall when limits are reached
+    if (uiState.showPaywall) {
+        PaywallScreen(
+            onDismiss = { /* User can't dismiss when limit reached */ },
+            onSubscribed = { 
+                // User upgraded, they can now record
+                onCancel() // Go back to previous screen
+            }
+        )
+    }
+    
+    // Show duration limit warning
+    if (uiState.maxDurationReached) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("Recording Limit Reached") },
+            text = { 
+                Text("You've reached the maximum recording duration for free users (2 minutes). Upgrade to Premium for up to 10-minute recordings!")
+            },
+            confirmButton = {
+                TextButton(onClick = onCancel) {
+                    Text("OK")
+                }
+            }
+        )
     }
 }
 

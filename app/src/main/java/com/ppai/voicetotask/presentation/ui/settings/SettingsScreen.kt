@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ppai.voicetotask.presentation.viewmodel.SettingsViewModel
+import com.ppai.voicetotask.presentation.ui.paywall.PaywallScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,8 +25,10 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val subscription by viewModel.subscription.collectAsStateWithLifecycle()
     var darkThemeEnabled by remember { mutableStateOf(false) }
     var dynamicColorEnabled by remember { mutableStateOf(true) }
+    var showPaywall by remember { mutableStateOf(false) }
     
     Scaffold(
         topBar = {
@@ -83,6 +86,47 @@ fun SettingsScreen(
                     subtitle = "Configure API key",
                     onClick = { /* TODO: Show API key dialog */ }
                 )
+            }
+            
+            Divider()
+            
+            // Subscription Section
+            SettingsSection(title = "Subscription") {
+                SettingsItem(
+                    icon = Icons.Default.WorkspacePremium,
+                    title = if (subscription?.isPremium() == true) "Premium" else "Free",
+                    subtitle = when {
+                        subscription?.isPremium() == true -> "Unlimited recordings • No ads"
+                        else -> "${subscription?.getRemainingRecordings() ?: 30} recordings left this month"
+                    },
+                    onClick = { 
+                        if (subscription?.isPremium() != true) {
+                            showPaywall = true
+                        }
+                    },
+                    trailing = {
+                        if (subscription?.isPremium() != true) {
+                            TextButton(onClick = { showPaywall = true }) {
+                                Text("Upgrade")
+                            }
+                        } else {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = "Premium active",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                )
+                
+                if (subscription?.isPremium() != true) {
+                    SettingsItem(
+                        icon = Icons.Default.Restore,
+                        title = "Restore Purchase",
+                        subtitle = "Restore previous purchases",
+                        onClick = { viewModel.restorePurchases() }
+                    )
+                }
             }
             
             Divider()
@@ -157,6 +201,29 @@ fun SettingsScreen(
             }
         ) {
             Text("All notes and tasks have been deleted")
+        }
+    }
+    
+    // Show paywall
+    if (showPaywall) {
+        PaywallScreen(
+            onDismiss = { showPaywall = false },
+            onSubscribed = { 
+                showPaywall = false
+                viewModel.refreshSubscription()
+            }
+        )
+    }
+    
+    // Restore purchase result
+    uiState.restorePurchaseResult?.let { success ->
+        LaunchedEffect(success) {
+            if (success) {
+                // Show success message
+            } else {
+                // Show error message  
+            }
+            viewModel.clearRestorePurchaseResult()
         }
     }
 }
