@@ -8,6 +8,8 @@ import com.ppai.voicetotask.presentation.ui.components.TaskFilter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
 import java.util.Date
 import javax.inject.Inject
 
@@ -29,52 +31,58 @@ class TasksViewModel @Inject constructor(
         observeTasks()
     }
     
+    @OptIn(FlowPreview::class)
     private fun observeTasks() {
         viewModelScope.launch {
             try {
                 combine(
                     _selectedFilter,
-                    _searchQuery,
-                    taskRepository.getAllTasks()
-                ) { filter, query, allTasks ->
-                    Triple(filter, query, allTasks)
-                }.collect { (filter, query, allTasks) ->
-                println("TasksViewModel: Loaded ${allTasks.size} tasks from database")
-                allTasks.forEach { task ->
-                    println("Task: ${task.title}, Note: ${task.noteId}, Completed: ${task.completed}")
-                }
-                val filteredByType = when (filter) {
-                    TaskFilter.All -> allTasks
-                    TaskFilter.Today -> allTasks.filter { task ->
-                        task.dueDate != null && isToday(task.dueDate) && !task.completed
+                    _searchQuery.debounce(300).distinctUntilChanged()
+                ) { filter, query ->
+                    Pair(filter, query)
+                }.flatMapLatest { (filter, query) ->
+                    // Get appropriate flow based on filter
+                    val baseFlow = when (filter) {
+                        TaskFilter.All -> if (query.isEmpty()) taskRepository.getAllTasks() else taskRepository.searchTasks(query)
+                        TaskFilter.Today -> taskRepository.getTodayTasks()
+                        TaskFilter.Overdue -> taskRepository.getOverdueTasks()
+                        TaskFilter.Completed -> taskRepository.getCompletedTasks()
+                        TaskFilter.Upcoming -> taskRepository.getActiveTasks() // For upcoming tasks
+                        else -> taskRepository.getAllTasks()
                     }
-                    TaskFilter.Overdue -> allTasks.filter { task ->
-                        task.dueDate != null && task.dueDate.before(Date()) && !isToday(task.dueDate) && !task.completed
+                    
+                    baseFlow.map { tasks ->
+                        // Apply additional filtering for search query on filtered results
+                        val finalTasks = if (query.isNotEmpty() && filter != TaskFilter.All) {
+                            tasks.filter { task ->
+                                task.title.contains(query, ignoreCase = true)
+                            }
+                        } else {
+                            tasks
+                        }
+                        
+                        // For upcoming filter, exclude today and overdue
+                        if (filter == TaskFilter.Upcoming) {
+                            finalTasks.filter { task ->
+                                task.dueDate != null && 
+                                task.dueDate.after(Date()) && 
+                                !isToday(task.dueDate) &&
+                                !task.completed
+                            }
+                        } else {
+                            finalTasks
+                        }
                     }
-                    TaskFilter.Upcoming -> allTasks.filter { task ->
-                        task.dueDate != null && task.dueDate.after(Date()) && !task.completed
-                    }
-                    TaskFilter.Completed -> allTasks.filter { it.completed }
-                    else -> allTasks
-                }
-                
-                val filteredTasks = if (query.isEmpty()) {
-                    filteredByType
-                } else {
-                    filteredByType.filter { task ->
-                        task.title.contains(query, ignoreCase = true)
+                }.collect { filteredTasks ->
+                    _uiState.update { currentState ->
+                        currentState.copy(
+                            filteredTasks = filteredTasks,
+                            allTasks = filteredTasks, // For consistency
+                            isLoading = false,
+                            error = null
+                        )
                     }
                 }
-                
-                _uiState.update { currentState ->
-                    currentState.copy(
-                        allTasks = allTasks,
-                        filteredTasks = filteredTasks,
-                        isLoading = false,
-                        error = null
-                    )
-                }
-            }
             } catch (e: Exception) {
                 _uiState.update { currentState ->
                     currentState.copy(
@@ -128,6 +136,21 @@ class TasksViewModel @Inject constructor(
         val cal2 = java.util.Calendar.getInstance().apply { time = date2 }
         return cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR) &&
                 cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR)
+    }
+    
+    fun deleteTask(taskId: String) {
+        viewModelScope.launch {
+            try {
+                val task = _uiState.value.allTasks.find { it.id == taskId } ?: return@launch
+                taskRepository.deleteTask(task)
+            } catch (e: Exception) {
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        error = "Failed to delete task: ${e.message}"
+                    )
+                }
+            }
+        }
     }
 }
 

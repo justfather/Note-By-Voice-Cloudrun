@@ -1,8 +1,10 @@
 package com.ppai.voicetotask.di
 
 import com.ppai.voicetotask.data.repository.NoteRepositoryImpl
+import com.ppai.voicetotask.data.repository.SettingsRepositoryImpl
 import com.ppai.voicetotask.data.repository.TaskRepositoryImpl
 import com.ppai.voicetotask.domain.repository.NoteRepository
+import com.ppai.voicetotask.domain.repository.SettingsRepository
 import com.ppai.voicetotask.domain.repository.TaskRepository
 import dagger.Binds
 import dagger.Module
@@ -25,4 +27,10 @@ abstract class RepositoryModule {
     abstract fun bindTaskRepository(
         taskRepositoryImpl: TaskRepositoryImpl
     ): TaskRepository
+    
+    @Binds
+    @Singleton
+    abstract fun bindSettingsRepository(
+        settingsRepositoryImpl: SettingsRepositoryImpl
+    ): SettingsRepository
 }

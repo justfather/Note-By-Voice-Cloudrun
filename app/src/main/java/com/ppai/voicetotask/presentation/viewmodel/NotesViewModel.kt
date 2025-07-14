@@ -7,6 +7,8 @@ import com.ppai.voicetotask.domain.repository.NoteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
 import javax.inject.Inject
 
 @HiltViewModel
@@ -24,31 +26,29 @@ class NotesViewModel @Inject constructor(
         observeNotes()
     }
     
+    @OptIn(FlowPreview::class)
     private fun observeNotes() {
         viewModelScope.launch {
             try {
-                combine(
-                    noteRepository.getAllNotesWithTasks(),
-                    _searchQuery
-                ) { notes, query ->
-                    if (query.isEmpty()) {
-                        notes
-                    } else {
-                        notes.filter { note ->
-                            note.title.contains(query, ignoreCase = true) ||
-                            note.transcript.contains(query, ignoreCase = true) ||
-                            note.summary.contains(query, ignoreCase = true)
+                _searchQuery
+                    .debounce(300) // Debounce to avoid excessive queries
+                    .distinctUntilChanged()
+                    .flatMapLatest { query ->
+                        if (query.isEmpty()) {
+                            noteRepository.getAllNotesWithTasks()
+                        } else {
+                            noteRepository.searchNotes(query)
                         }
                     }
-                }.collect { filteredNotes ->
-                    _uiState.update { currentState ->
-                        currentState.copy(
-                            notes = filteredNotes,
-                            isLoading = false,
-                            error = null
-                        )
+                    .collect { notes ->
+                        _uiState.update { currentState ->
+                            currentState.copy(
+                                notes = notes,
+                                isLoading = false,
+                                error = null
+                            )
+                        }
                     }
-                }
             } catch (e: Exception) {
                 _uiState.update { currentState ->
                     currentState.copy(

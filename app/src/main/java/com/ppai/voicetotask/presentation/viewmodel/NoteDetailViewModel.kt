@@ -68,6 +68,17 @@ class NoteDetailViewModel @Inject constructor(
             }
         }
     }
+    
+    fun deleteTask(taskId: String) {
+        viewModelScope.launch {
+            _uiState.value.note?.let { note ->
+                val task = note.tasks.find { it.id == taskId } ?: return@launch
+                taskRepository.deleteTask(task)
+                // Reload note to get updated tasks
+                loadNote(note.id)
+            }
+        }
+    }
 }
 
 data class NoteDetailUiState(

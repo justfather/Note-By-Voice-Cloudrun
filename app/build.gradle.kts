@@ -164,6 +164,9 @@ dependencies {
     // DataStore for subscription cache
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     
+    // JWT for token parsing
+    implementation("com.auth0.android:jwtdecode:2.0.2")
+    
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

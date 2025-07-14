@@ -35,5 +35,9 @@ sealed class DetailScreen(val route: String) {
         fun createRoute(noteId: String) = "note_detail/$noteId"
     }
     
+    object EditNote : DetailScreen("edit_note/{noteId}") {
+        fun createRoute(noteId: String) = "edit_note/$noteId"
+    }
+    
     object Recording : DetailScreen("recording")
 }

@@ -31,7 +31,7 @@ class RecordingViewModel @Inject constructor(
     private val noteRepository: NoteRepository,
     private val taskRepository: TaskRepository,
     private val subscriptionRepository: SubscriptionRepository,
-    private val adManager: AdManager
+    val adManager: AdManager
 ) : AndroidViewModel(application) {
     
     private val _uiState = MutableStateFlow(RecordingUiState())
@@ -279,8 +279,6 @@ class RecordingViewModel @Inject constructor(
             }
         }
     }
-    
-    fun getAdManager(): AdManager = adManager
     
     override fun onCleared() {
         super.onCleared()

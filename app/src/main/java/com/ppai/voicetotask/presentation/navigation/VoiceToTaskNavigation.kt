@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.ppai.voicetotask.presentation.ui.notes.NotesListScreen
 import com.ppai.voicetotask.presentation.ui.notes.NoteDetailScreen
+import com.ppai.voicetotask.presentation.ui.notes.EditNoteScreen
 import com.ppai.voicetotask.presentation.ui.tasks.TasksListScreen
 import com.ppai.voicetotask.presentation.ui.recording.RecordingScreen
 import com.ppai.voicetotask.presentation.ui.settings.SettingsScreen
@@ -48,7 +49,24 @@ fun VoiceToTaskNavigation(
             val noteId = backStackEntry.arguments?.getString("noteId") ?: ""
             NoteDetailScreen(
                 noteId = noteId,
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                onEditClick = { noteId ->
+                    navController.navigate(DetailScreen.EditNote.createRoute(noteId))
+                }
+            )
+        }
+        
+        composable(
+            route = DetailScreen.EditNote.route,
+            arguments = listOf(
+                navArgument("noteId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val noteId = backStackEntry.arguments?.getString("noteId") ?: ""
+            EditNoteScreen(
+                noteId = noteId,
+                onBackClick = { navController.popBackStack() },
+                onSaveComplete = { navController.popBackStack() }
             )
         }
         

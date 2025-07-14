@@ -17,6 +17,7 @@ import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
 import com.ppai.voicetotask.util.DateParser
+import com.ppai.voicetotask.data.preferences.OutputLanguage
 
 @Singleton
 class GeminiAiService @Inject constructor() : AiService {
@@ -45,17 +46,22 @@ class GeminiAiService @Inject constructor() : AiService {
     )
     
     
-    suspend fun generateTitle(text: String): String = withContext(Dispatchers.IO) {
+    suspend fun generateTitle(text: String, outputLanguage: OutputLanguage = OutputLanguage.AUTO): String = withContext(Dispatchers.IO) {
         
         repeat(3) { attempt ->
             try {
                 Log.d(TAG, "Generating title for text: ${text.take(100)}... (attempt ${attempt + 1})")
                 
+                val languageInstruction = when (outputLanguage) {
+                    OutputLanguage.AUTO -> "Write in the same language as the transcript."
+                    else -> "Write the title in ${outputLanguage.displayName}."
+                }
+                
                 val prompt = """
                     Generate a concise, descriptive title for the following transcript.
                     The title should be 3-8 words that capture the main topic or purpose.
                     Do not use quotes around the title.
-                    Write in the same language as the transcript.
+                    $languageInstruction
                     
                     Transcript:
                     $text
@@ -84,7 +90,11 @@ class GeminiAiService @Inject constructor() : AiService {
                         firstSentence.take(47) + "..."
                     } else {
                         firstSentence.ifEmpty { 
-                            if (detectLanguage(text) == "th") "บันทึกเสียง" else "Voice Note"
+                            when (outputLanguage) {
+                                OutputLanguage.THAI -> "บันทึกเสียง"
+                                OutputLanguage.AUTO -> if (detectLanguage(text) == "th") "บันทึกเสียง" else "Voice Note"
+                                else -> "Voice Note"
+                            }
                         }
                     }
                 }
@@ -93,26 +103,37 @@ class GeminiAiService @Inject constructor() : AiService {
         
         // Final fallback
         val dateFormat = SimpleDateFormat("MMM d", Locale.getDefault())
-        val fallbackTitle = if (Locale.getDefault().language == "th") {
-            "บันทึกเสียง ${dateFormat.format(Date())}"
-        } else {
-            "Voice Note ${dateFormat.format(Date())}"
+        val fallbackTitle = when (outputLanguage) {
+            OutputLanguage.THAI -> "บันทึกเสียง ${dateFormat.format(Date())}"
+            OutputLanguage.AUTO -> if (Locale.getDefault().language == "th") "บันทึกเสียง ${dateFormat.format(Date())}" else "Voice Note ${dateFormat.format(Date())}"
+            else -> "Voice Note ${dateFormat.format(Date())}"
         }
         return@withContext fallbackTitle
     }
     
-    override suspend fun generateSummary(text: String): String = withContext(Dispatchers.IO) {
+    suspend fun generateSummary(text: String, outputLanguage: OutputLanguage = OutputLanguage.AUTO): String = withContext(Dispatchers.IO) {
+        generateSummaryWithLanguage(text, outputLanguage)
+    }
+    
+    override suspend fun generateSummary(text: String): String = generateSummary(text, OutputLanguage.AUTO)
+    
+    private suspend fun generateSummaryWithLanguage(text: String, outputLanguage: OutputLanguage): String = withContext(Dispatchers.IO) {
         
         repeat(3) { attempt ->
             try {
                 Log.d(TAG, "Generating summary for text: ${text.take(100)}... (attempt ${attempt + 1})")
+                
+                val languageInstruction = when (outputLanguage) {
+                    OutputLanguage.AUTO -> "Write in the same language as the transcript"
+                    else -> "Write the summary in ${outputLanguage.displayName}"
+                }
                 
                 val prompt = """
                     Please provide a concise summary of the following transcript as bullet points.
                     - Include 3-5 key points
                     - Each bullet point should be clear and concise
                     - Focus on the main topics, decisions, and action items
-                    - Write in the same language as the transcript
+                    - $languageInstruction
                     
                     Transcript:
                     $text
@@ -142,10 +163,10 @@ class GeminiAiService @Inject constructor() : AiService {
                 } else {
                     // On final attempt, return fallback instead of throwing
                     Log.e(TAG, "All summary attempts failed, returning fallback")
-                    val fallbackMessage = if (detectLanguage(text) == "th") {
-                        "ไม่สามารถสร้างสรุปได้ชั่วคราว"
-                    } else {
-                        "Summary generation temporarily unavailable"
+                    val fallbackMessage = when (outputLanguage) {
+                        OutputLanguage.THAI -> "ไม่สามารถสร้างสรุปได้ชั่วคราว"
+                        OutputLanguage.AUTO -> if (detectLanguage(text) == "th") "ไม่สามารถสร้างสรุปได้ชั่วคราว" else "Summary generation temporarily unavailable"
+                        else -> "Summary generation temporarily unavailable"
                     }
                     return@withContext fallbackMessage
                 }
@@ -156,17 +177,27 @@ class GeminiAiService @Inject constructor() : AiService {
         return@withContext "Summary generation temporarily unavailable"
     }
     
-    override suspend fun extractTasks(text: String): List<Task> = withContext(Dispatchers.IO) {
+    suspend fun extractTasks(text: String, outputLanguage: OutputLanguage = OutputLanguage.AUTO): List<Task> = withContext(Dispatchers.IO) {
+        extractTasksWithLanguage(text, outputLanguage)
+    }
+    
+    override suspend fun extractTasks(text: String): List<Task> = extractTasks(text, OutputLanguage.AUTO)
+    
+    private suspend fun extractTasksWithLanguage(text: String, outputLanguage: OutputLanguage): List<Task> = withContext(Dispatchers.IO) {
         
         repeat(3) { attempt ->
             try {
                 Log.d(TAG, "Extracting tasks from text: ${text.take(100)}... (attempt ${attempt + 1})")
                 
-                val isThaiLanguage = detectLanguage(text) == "th"
+                val shouldUseThai = when (outputLanguage) {
+                    OutputLanguage.THAI -> true
+                    OutputLanguage.AUTO -> detectLanguage(text) == "th"
+                    else -> false
+                }
                 
                 val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
                 
-                val prompt = if (isThaiLanguage) {
+                val prompt = if (shouldUseThai) {
                     """
                     ดึงงานที่ต้องทำจากข้อความต่อไปนี้
                     มองหา:

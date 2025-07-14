@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ppai.voicetotask.presentation.ui.components.TaskItem
+import com.ppai.voicetotask.presentation.ui.components.SwipeableTaskItem
 import com.ppai.voicetotask.presentation.viewmodel.NoteDetailViewModel
 import com.ppai.voicetotask.presentation.ui.components.swipeGesture
 import com.ppai.voicetotask.presentation.ui.components.FocusModeContainer
@@ -29,6 +30,7 @@ import java.util.*
 fun NoteDetailScreen(
     noteId: String,
     onBackClick: () -> Unit,
+    onEditClick: (String) -> Unit = {},
     viewModel: NoteDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -53,7 +55,7 @@ fun NoteDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* TODO: Edit note */ }) {
+                    IconButton(onClick = { onEditClick(noteId) }) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit")
                     }
                     IconButton(onClick = { showDeleteDialog = true }) {
@@ -219,9 +221,10 @@ fun NoteDetailScreen(
                         }
                         
                         items(note.tasks) { task ->
-                            TaskItem(
+                            SwipeableTaskItem(
                                 task = task,
                                 onToggleComplete = { viewModel.toggleTaskComplete(task.id) },
+                                onDelete = { viewModel.deleteTask(task.id) },
                                 onAddToCalendar = { /* Calendar integration will be handled by TaskItem */ }
                             )
                         }

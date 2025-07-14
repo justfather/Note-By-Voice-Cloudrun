@@ -39,7 +39,7 @@ fun SwipeableNoteItem(
     
     var offsetX by remember { mutableFloatStateOf(0f) }
     var width by remember { mutableIntStateOf(0) }
-    val dismissThreshold = 0.5f
+    val dismissThreshold = 0.25f // Reduced from 0.5f to make swipe easier
     
     val animatedOffsetX by animateFloatAsState(
         targetValue = offsetX,

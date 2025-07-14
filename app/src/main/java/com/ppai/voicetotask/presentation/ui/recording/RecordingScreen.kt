@@ -48,7 +48,7 @@ fun RecordingScreen(
     val activity = context as? android.app.Activity
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var hasPermission by remember { mutableStateOf(false) }
-    val adManager = remember { viewModel.getAdManager() }
+    val adManager = viewModel.adManager
     
     PermissionHandler(
         permission = Manifest.permission.RECORD_AUDIO,
@@ -287,6 +287,25 @@ fun RecordingScreen(
                 onCancel() // Go back to previous screen
             }
         )
+    }
+    
+    // Show ad when recording stops (for free users)
+    if (uiState.showingAd && activity != null) {
+        LaunchedEffect(Unit) {
+            Log.d("RecordingScreen", "Showing interstitial ad for free user")
+            adManager.showInterstitialAd(
+                activity = activity,
+                onAdDismissed = {
+                    Log.d("RecordingScreen", "Ad dismissed, processing recording")
+                    viewModel.onAdDismissed()
+                },
+                onAdFailed = {
+                    Log.d("RecordingScreen", "Ad failed to show, processing recording anyway")
+                    // If ad fails, still process the recording
+                    viewModel.onAdDismissed()
+                }
+            )
+        }
     }
     
     // Show duration limit warning

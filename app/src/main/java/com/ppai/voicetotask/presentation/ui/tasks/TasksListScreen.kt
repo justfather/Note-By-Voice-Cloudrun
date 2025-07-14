@@ -159,10 +159,13 @@ fun TasksListScreen(
                                                         items = tasks,
                                                         key = { it.id }
                                                     ) { task ->
-                                                        TaskItem(
+                                                        SwipeableTaskItem(
                                                             task = task,
                                                             onToggleComplete = {
                                                                 viewModel.toggleTaskComplete(task.id)
+                                                            },
+                                                            onDelete = {
+                                                                viewModel.deleteTask(task.id)
                                                             },
                                                             showNote = true,
                                                             modifier = Modifier.padding(start = 16.dp),
@@ -206,10 +209,13 @@ fun TasksListScreen(
                                             items = tasks,
                                             key = { it.id }
                                         ) { task ->
-                                            TaskItem(
+                                            SwipeableTaskItem(
                                                 task = task,
                                                 onToggleComplete = {
                                                     viewModel.toggleTaskComplete(task.id)
+                                                },
+                                                onDelete = {
+                                                    viewModel.deleteTask(task.id)
                                                 },
                                                 showNote = true,
                                                 onAddToCalendar = { /* Calendar integration handled in TaskItem */ }
@@ -223,10 +229,13 @@ fun TasksListScreen(
                                     items = uiState.filteredTasks,
                                     key = { it.id }
                                 ) { task ->
-                                    TaskItem(
+                                    SwipeableTaskItem(
                                         task = task,
                                         onToggleComplete = {
                                             viewModel.toggleTaskComplete(task.id)
+                                        },
+                                        onDelete = {
+                                            viewModel.deleteTask(task.id)
                                         },
                                         showNote = true,
                                         onAddToCalendar = { /* Calendar integration handled in TaskItem */ }

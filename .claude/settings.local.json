@@ -14,7 +14,22 @@
       "Bash(adb install:*)",
       "Bash(ls:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(git remote remove:*)",
+      "Bash(git config:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(adb:*)",
+      "Bash(/Users/ppai/Library/Android/sdk/platform-tools/adb devices)",
+      "Bash(/Users/ppai/Library/Android/sdk/platform-tools/adb kill-server)",
+      "Bash(/Users/ppai/Library/Android/sdk/platform-tools/adb start-server)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(gh auth login:*)",
+      "Bash(brew install:*)"
     ],
     "deny": []
   }

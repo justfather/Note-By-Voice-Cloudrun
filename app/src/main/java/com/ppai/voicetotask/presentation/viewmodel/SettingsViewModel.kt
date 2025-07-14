@@ -3,7 +3,11 @@ package com.ppai.voicetotask.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ppai.voicetotask.data.billing.BillingManager
+import com.ppai.voicetotask.data.preferences.OutputLanguage
+import com.ppai.voicetotask.data.preferences.ThemeMode
+import com.ppai.voicetotask.data.preferences.UserPreferencesData
 import com.ppai.voicetotask.domain.model.Subscription
+import com.ppai.voicetotask.domain.repository.SettingsRepository
 import com.ppai.voicetotask.domain.repository.SubscriptionRepository
 import com.ppai.voicetotask.domain.usecase.DeleteAllNotesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -19,6 +23,7 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val deleteAllNotesUseCase: DeleteAllNotesUseCase,
     private val subscriptionRepository: SubscriptionRepository,
+    private val settingsRepository: SettingsRepository,
     private val billingManager: BillingManager
 ) : ViewModel() {
     
@@ -30,6 +35,13 @@ class SettingsViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = null
+        )
+    
+    val userPreferences: StateFlow<UserPreferencesData> = settingsRepository.userPreferences
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = UserPreferencesData()
         )
     
     fun onDeleteAllNotesClick() {
@@ -105,6 +117,24 @@ class SettingsViewModel @Inject constructor(
     
     fun refreshSubscription() {
         // Subscription is automatically refreshed via Flow
+    }
+    
+    fun updateThemeMode(themeMode: ThemeMode) {
+        viewModelScope.launch {
+            settingsRepository.updateThemeMode(themeMode)
+        }
+    }
+    
+    fun updateDynamicColors(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.updateDynamicColors(enabled)
+        }
+    }
+    
+    fun updateOutputLanguage(language: OutputLanguage) {
+        viewModelScope.launch {
+            settingsRepository.updateOutputLanguage(language)
+        }
     }
 }
 

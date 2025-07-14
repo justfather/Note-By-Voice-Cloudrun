@@ -1,11 +1,9 @@
 package com.ppai.voicetotask.di
 
-import com.ppai.voicetotask.data.remote.api.AiService
-import com.ppai.voicetotask.data.remote.api.GeminiAiService
-import com.ppai.voicetotask.data.remote.api.GeminiSpeechToTextService
-import com.ppai.voicetotask.data.remote.api.SpeechToTextService
+import com.ppai.voicetotask.data.remote.api.*
 import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
@@ -20,9 +18,18 @@ abstract class ApiModule {
         geminiSpeechToTextService: GeminiSpeechToTextService
     ): SpeechToTextService
     
-    @Binds
-    @Singleton
-    abstract fun bindAiService(
-        geminiAiService: GeminiAiService
-    ): AiService
+    companion object {
+        @Provides
+        @Singleton
+        fun provideAiService(
+            geminiAiService: GeminiAiService,
+            backendAiService: BackendAiService
+        ): AiService {
+            return if (FeatureFlags.USE_BACKEND_API) {
+                backendAiService
+            } else {
+                geminiAiService
+            }
+        }
+    }
 }

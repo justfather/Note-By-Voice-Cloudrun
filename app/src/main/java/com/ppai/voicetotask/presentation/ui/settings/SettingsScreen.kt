@@ -2,7 +2,9 @@ package com.ppai.voicetotask.presentation.ui.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -17,6 +19,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ppai.voicetotask.presentation.viewmodel.SettingsViewModel
 import com.ppai.voicetotask.presentation.ui.paywall.PaywallScreen
+import com.ppai.voicetotask.data.preferences.ThemeMode
+import com.ppai.voicetotask.data.preferences.OutputLanguage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,9 +30,10 @@ fun SettingsScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val subscription by viewModel.subscription.collectAsStateWithLifecycle()
-    var darkThemeEnabled by remember { mutableStateOf(false) }
-    var dynamicColorEnabled by remember { mutableStateOf(true) }
+    val userPreferences by viewModel.userPreferences.collectAsStateWithLifecycle()
     var showPaywall by remember { mutableStateOf(false) }
+    var showThemeModeDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
     
     Scaffold(
         topBar = {
@@ -46,49 +51,29 @@ fun SettingsScreen(
             SettingsSection(title = "Appearance") {
                 SettingsItem(
                     icon = Icons.Default.DarkMode,
-                    title = "Dark Theme",
-                    subtitle = "Use dark theme",
-                    trailing = {
-                        Switch(
-                            checked = darkThemeEnabled,
-                            onCheckedChange = { darkThemeEnabled = it }
-                        )
-                    }
-                )
-                
-                SettingsItem(
-                    icon = Icons.Default.Palette,
-                    title = "Dynamic Colors",
-                    subtitle = "Use Material You colors",
-                    trailing = {
-                        Switch(
-                            checked = dynamicColorEnabled,
-                            onCheckedChange = { dynamicColorEnabled = it }
-                        )
-                    }
+                    title = "Theme",
+                    subtitle = when(userPreferences.themeMode) {
+                        ThemeMode.SYSTEM -> "System default"
+                        ThemeMode.LIGHT -> "Light"
+                        ThemeMode.DARK -> "Dark"
+                    },
+                    onClick = { showThemeModeDialog = true }
                 )
             }
             
-            Divider()
+            HorizontalDivider()
             
-            // AI Settings
-            SettingsSection(title = "AI Configuration") {
+            // Language Settings
+            SettingsSection(title = "Language") {
                 SettingsItem(
-                    icon = Icons.Default.Psychology,
-                    title = "AI Provider",
-                    subtitle = "OpenAI GPT-4",
-                    onClick = { /* TODO: Show AI provider dialog */ }
-                )
-                
-                SettingsItem(
-                    icon = Icons.Default.Key,
-                    title = "API Key",
-                    subtitle = "Configure API key",
-                    onClick = { /* TODO: Show API key dialog */ }
+                    icon = Icons.Default.Language,
+                    title = "Output Language",
+                    subtitle = userPreferences.outputLanguage.displayName,
+                    onClick = { showLanguageDialog = true }
                 )
             }
             
-            Divider()
+            HorizontalDivider()
             
             // Subscription Section
             SettingsSection(title = "Subscription") {
@@ -119,17 +104,23 @@ fun SettingsScreen(
                     }
                 )
                 
-                if (subscription?.isPremium() != true) {
-                    SettingsItem(
-                        icon = Icons.Default.Restore,
-                        title = "Restore Purchase",
-                        subtitle = "Restore previous purchases",
-                        onClick = { viewModel.restorePurchases() }
-                    )
-                }
+                SettingsItem(
+                    icon = Icons.Default.Restore,
+                    title = "Restore Purchase",
+                    subtitle = "Restore previous purchases",
+                    onClick = { viewModel.restorePurchases() },
+                    trailing = {
+                        if (uiState.isRestoringPurchase) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp
+                            )
+                        }
+                    }
+                )
             }
             
-            Divider()
+            HorizontalDivider()
             
             // Data Management
             SettingsSection(title = "Data Management") {
@@ -141,7 +132,7 @@ fun SettingsScreen(
                 )
             }
             
-            Divider()
+            HorizontalDivider()
             
             // About
             SettingsSection(title = "About") {
@@ -218,13 +209,43 @@ fun SettingsScreen(
     // Restore purchase result
     uiState.restorePurchaseResult?.let { success ->
         LaunchedEffect(success) {
-            if (success) {
-                // Show success message
-            } else {
-                // Show error message  
-            }
             viewModel.clearRestorePurchaseResult()
         }
+        
+        Snackbar(
+            modifier = Modifier.padding(16.dp),
+            action = {
+                TextButton(onClick = { viewModel.clearRestorePurchaseResult() }) {
+                    Text("OK")
+                }
+            }
+        ) {
+            Text(if (success) "Purchase restored successfully!" else "No purchases found to restore")
+        }
+    }
+    
+    // Theme mode selection dialog
+    if (showThemeModeDialog) {
+        ThemeModeDialog(
+            currentThemeMode = userPreferences.themeMode,
+            onThemeModeSelected = { themeMode ->
+                viewModel.updateThemeMode(themeMode)
+                showThemeModeDialog = false
+            },
+            onDismiss = { showThemeModeDialog = false }
+        )
+    }
+    
+    // Language selection dialog
+    if (showLanguageDialog) {
+        LanguageSelectionDialog(
+            currentLanguage = userPreferences.outputLanguage,
+            onLanguageSelected = { language ->
+                viewModel.updateOutputLanguage(language)
+                showLanguageDialog = false
+            },
+            onDismiss = { showLanguageDialog = false }
+        )
     }
 }
 
@@ -342,6 +363,104 @@ fun DeleteAllNotesConfirmationDialog(
                 onClick = onDismiss,
                 enabled = !isDeleting
             ) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ThemeModeDialog(
+    currentThemeMode: ThemeMode,
+    onThemeModeSelected: (ThemeMode) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Choose theme",
+                style = MaterialTheme.typography.headlineSmall
+            )
+        },
+        text = {
+            Column {
+                ThemeMode.values().forEach { themeMode ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onThemeModeSelected(themeMode) }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = currentThemeMode == themeMode,
+                            onClick = { onThemeModeSelected(themeMode) }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = when(themeMode) {
+                                ThemeMode.SYSTEM -> "System default"
+                                ThemeMode.LIGHT -> "Light"
+                                ThemeMode.DARK -> "Dark"
+                            },
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LanguageSelectionDialog(
+    currentLanguage: OutputLanguage,
+    onLanguageSelected: (OutputLanguage) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Choose output language",
+                style = MaterialTheme.typography.headlineSmall
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())
+            ) {
+                OutputLanguage.values().forEach { language ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onLanguageSelected(language) }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = currentLanguage == language,
+                            onClick = { onLanguageSelected(language) }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = language.displayName,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         }

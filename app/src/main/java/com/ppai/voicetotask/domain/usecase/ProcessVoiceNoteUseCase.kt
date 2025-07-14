@@ -1,12 +1,15 @@
 package com.ppai.voicetotask.domain.usecase
 
 import android.media.MediaMetadataRetriever
+import com.ppai.voicetotask.data.preferences.OutputLanguage
 import com.ppai.voicetotask.data.remote.api.AiService
 import com.ppai.voicetotask.data.remote.api.GeminiAiService
 import com.ppai.voicetotask.data.remote.api.SpeechToTextService
 import com.ppai.voicetotask.domain.model.Note
 import com.ppai.voicetotask.domain.model.Priority
 import com.ppai.voicetotask.domain.model.Task
+import com.ppai.voicetotask.domain.repository.SettingsRepository
+import kotlinx.coroutines.flow.first
 import java.io.File
 import java.util.*
 import javax.inject.Inject
@@ -14,13 +17,18 @@ import android.util.Log
 
 class ProcessVoiceNoteUseCase @Inject constructor(
     private val speechToTextService: SpeechToTextService,
-    private val aiService: AiService
+    private val aiService: AiService,
+    private val settingsRepository: SettingsRepository
 ) {
     companion object {
         private const val TAG = "ProcessVoiceNoteUseCase"
     }
     suspend operator fun invoke(audioFilePath: String): Note {
         Log.d(TAG, "Starting to process audio file: $audioFilePath")
+        
+        // Get user's preferred output language
+        val userPreferences = settingsRepository.userPreferences.first()
+        val outputLanguage = userPreferences.outputLanguage
         
         // 1. Transcribe audio to text
         val transcript = try {
@@ -39,7 +47,7 @@ class ProcessVoiceNoteUseCase @Inject constructor(
         val title = try {
             Log.d(TAG, "Generating title...")
             val aiTitle = if (aiService is GeminiAiService) {
-                aiService.generateTitle(transcript)
+                aiService.generateTitle(transcript, outputLanguage)
             } else {
                 generateTitle(transcript)
             }
@@ -53,7 +61,11 @@ class ProcessVoiceNoteUseCase @Inject constructor(
         
         // 3. Generate AI summary
         val summary = try {
-            aiService.generateSummary(transcript)
+            if (aiService is GeminiAiService) {
+                aiService.generateSummary(transcript, outputLanguage)
+            } else {
+                aiService.generateSummary(transcript)
+            }
         } catch (e: Exception) {
             // Return empty summary if AI fails
             ""
@@ -61,7 +73,11 @@ class ProcessVoiceNoteUseCase @Inject constructor(
         
         // 4. Extract tasks from transcript
         val tasks = try {
-            val extractedTasks = aiService.extractTasks(transcript)
+            val extractedTasks = if (aiService is GeminiAiService) {
+                aiService.extractTasks(transcript, outputLanguage)
+            } else {
+                aiService.extractTasks(transcript)
+            }
             // Log the extracted tasks for debugging
             println("ProcessVoiceNoteUseCase: Extracted ${extractedTasks.size} tasks from transcript")
             extractedTasks.forEach { task ->

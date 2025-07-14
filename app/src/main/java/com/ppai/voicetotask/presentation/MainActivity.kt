@@ -16,6 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.ppai.voicetotask.presentation.navigation.DetailScreen
@@ -24,6 +26,8 @@ import com.ppai.voicetotask.presentation.navigation.VoiceToTaskNavigation
 import com.ppai.voicetotask.presentation.theme.VoiceToTaskTheme
 import com.ppai.voicetotask.presentation.ui.components.GradientBackground
 import com.ppai.voicetotask.presentation.ui.components.RecordingFAB
+import com.ppai.voicetotask.presentation.viewmodel.ThemeViewModel
+import com.ppai.voicetotask.presentation.viewmodel.shouldUseDarkTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -31,7 +35,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            VoiceToTaskTheme {
+            val themeViewModel: ThemeViewModel = hiltViewModel()
+            val userPreferences by themeViewModel.userPreferences.collectAsStateWithLifecycle()
+            
+            VoiceToTaskTheme(
+                darkTheme = userPreferences.shouldUseDarkTheme(),
+                dynamicColor = false
+            ) {
                 VoiceToTaskApp()
             }
         }
