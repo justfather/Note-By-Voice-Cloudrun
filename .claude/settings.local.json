@@ -29,7 +29,9 @@
       "Bash(npm init:*)",
       "Bash(npm install:*)",
       "Bash(gh auth login:*)",
-      "Bash(brew install:*)"
+      "Bash(brew install:*)",
+      "Bash(gh auth:*)",
+      "Bash(chmod:*)"
     ],
     "deny": []
   }
