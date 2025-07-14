@@ -48,8 +48,9 @@ app.use(errorHandler);
 
 // Start server
 const PORT = config.server.port;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT} in ${config.server.nodeEnv} mode`);
+const HOST = '0.0.0.0'; // Important for Cloud Run
+app.listen(PORT, HOST, () => {
+  console.log(`🚀 Server running on ${HOST}:${PORT} in ${config.server.nodeEnv} mode`);
   
   if (!config.googleCloud.projectId) {
     console.warn('⚠️  GOOGLE_CLOUD_PROJECT_ID not set');
