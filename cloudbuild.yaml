@@ -1,0 +1,38 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/note-by-voice-backend', './backend']
+  
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/note-by-voice-backend']
+  
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'note-by-voice-cloudrun'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/note-by-voice-backend'
+      - '--region'
+      - 'asia-southeast1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--timeout'
+      - '300'
+      - '--service-account'
+      - '144159064911-compute@developer.gserviceaccount.com'
+      - '--set-env-vars'
+      - 'NODE_ENV=production,PORT=8080,GOOGLE_CLOUD_PROJECT_ID=notebyvoice,GEMINI_API_KEY_SECRET_NAME=gemini-api-key,JWT_SECRET=mySecretJWTKey2024,ALLOWED_ORIGINS=*'
+
+images:
+  - 'gcr.io/$PROJECT_ID/note-by-voice-backend'
